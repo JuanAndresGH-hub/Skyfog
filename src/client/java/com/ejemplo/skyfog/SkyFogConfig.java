@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 
 /**
  * Configuración cliente de SkyFog. ManagedConfig es el único escritor normal.
@@ -236,10 +237,33 @@ public final class SkyFogConfig extends Config {
         get().saveNow();
     }
 
+    /**
+     * Huella de los campos persistentes para detectar cambios hechos por la GUI.
+     */
+    public int persistentHash() {
+        ensureLiveState();
+        return Objects.hash(
+            general.enabled,
+            general.preset,
+            general.lastAppliedPreset,
+            general.skyMatchesFog,
+            general.darkness,
+            general.hideSun,
+            general.hideMoon,
+            general.hideStars,
+            general.hideClouds,
+            general.applyInOtherDimensions,
+            fog.start,
+            fog.end,
+            color.colorPreview
+        );
+    }
+
     @Override
     public void saveNow() {
         normalize();
         validate();
+        // ManagedConfig ya registró saveToFile() en saveRunnables.
         super.saveNow();
     }
 
@@ -349,6 +373,7 @@ public final class SkyFogConfig extends Config {
         SkyFogConfig config = get();
         config.general.preset = "Diana oscura";
         config.general.lastAppliedPreset = "";
+        config.general.enabled = true;
         config.general.darkness = 0.0F;
         config.general.skyMatchesFog = true;
         config.general.hideSun = true;
@@ -424,7 +449,6 @@ public final class SkyFogConfig extends Config {
         @ConfigEditorBoolean
         public boolean applyInOtherDimensions = false;
 
-        @Expose
         @ConfigOption(name = "Valores por defecto", desc = "Restaura la configuración inicial de SkyFog.")
         @ConfigEditorButton(buttonText = "Restablecer")
         public transient Runnable resetDefaults = SkyFogConfig::resetDefaults;

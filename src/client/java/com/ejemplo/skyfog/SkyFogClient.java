@@ -17,10 +17,13 @@ import net.minecraft.network.chat.Component;
  */
 public final class SkyFogClient implements ClientModInitializer {
     private static KeyMapping openScreenKey;
+    private static int lastSavedConfigHash;
+    private static int pendingConfigSaveTicks;
 
     @Override
     public void onInitializeClient() {
         SkyFogConfig.initializeManaged();
+        lastSavedConfigHash = SkyFogConfig.get().persistentHash();
         openScreenKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
             "key.skyfog.open_config",
             InputConstants.Type.KEYSYM,
@@ -30,6 +33,14 @@ public final class SkyFogClient implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openScreenKey.consumeClick()) {
                 SkyFogConfig.openEditor();
+            }
+            SkyFogConfig config = SkyFogConfig.get();
+            int currentHash = config.persistentHash();
+            if (currentHash != lastSavedConfigHash) {
+                lastSavedConfigHash = currentHash;
+                pendingConfigSaveTicks = 5;
+            } else if (pendingConfigSaveTicks > 0 && --pendingConfigSaveTicks == 0) {
+                config.saveNow();
             }
         });
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
