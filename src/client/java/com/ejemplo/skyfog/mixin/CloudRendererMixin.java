@@ -10,11 +10,11 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Evita que las nubes dibujen píxeles sobre el cielo uniforme.
+ * Prevents clouds from drawing over the uniform sky.
  */
 @Mixin(value = CloudRenderer.class, priority = 900)
 public abstract class CloudRendererMixin {
-    @Inject(method = "render", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "render", at = @At("HEAD"), cancellable = true, require = 0)
     private void skyfog$hideClouds(
         int color,
         CloudStatus cloudStatus,

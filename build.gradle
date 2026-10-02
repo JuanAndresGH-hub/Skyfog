@@ -11,7 +11,14 @@ base {
 
 repositories {
     maven { url = "https://maven.fabricmc.net/" }
-    maven { url = "https://maven.notenoughupdates.org/releases/" }
+    exclusiveContent {
+        forRepository {
+            maven { url = "https://maven.notenoughupdates.org/releases/" }
+        }
+        filter {
+            includeGroup "org.notenoughupdates.moulconfig"
+        }
+    }
     mavenCentral()
 }
 

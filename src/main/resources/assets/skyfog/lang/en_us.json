@@ -1,4 +1,10 @@
 {
   "key.skyfog.open_config": "Open SkyFog configuration",
-  "key.category.skyfog.general": "SkyFog"
+  "key.category.skyfog.general": "SkyFog",
+  "chat.skyfog.enabled.en": "SkyFog enabled",
+  "chat.skyfog.disabled.en": "SkyFog disabled",
+  "chat.skyfog.start_invalid.en": "start must be less than end",
+  "chat.skyfog.end_invalid.en": "end must be greater than start",
+  "chat.skyfog.updated.en": "SkyFog configuration updated",
+  "chat.skyfog.color_updated.en": "SkyFog color updated"
 }

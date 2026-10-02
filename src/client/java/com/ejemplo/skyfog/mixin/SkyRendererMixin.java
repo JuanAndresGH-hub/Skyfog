@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Hace que el disco de cielo use el color de la niebla y elimina los elementos celestes.
+ * Makes the sky disc use the fog color and removes sky elements.
  */
 @Mixin(value = SkyRenderer.class, priority = 900)
 public abstract class SkyRendererMixin {
@@ -31,7 +31,7 @@ public abstract class SkyRendererMixin {
         }
     }
 
-    @Inject(method = "renderSun", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "renderSun", at = @At("HEAD"), cancellable = true, require = 0)
     private void skyfog$hideSun(float rainBrightness, PoseStack poseStack, CallbackInfo callback) {
         SkyFogConfig config = SkyFogConfig.get();
         if (config.enabled() && config.appliesToCurrentDimension() && config.general.hideSun) {
@@ -39,7 +39,7 @@ public abstract class SkyRendererMixin {
         }
     }
 
-    @Inject(method = "renderMoon", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "renderMoon", at = @At("HEAD"), cancellable = true, require = 0)
     private void skyfog$hideMoon(net.minecraft.world.level.MoonPhase moonPhase, float rainBrightness, PoseStack poseStack, CallbackInfo callback) {
         SkyFogConfig config = SkyFogConfig.get();
         if (config.enabled() && config.appliesToCurrentDimension() && config.general.hideMoon) {
@@ -47,7 +47,7 @@ public abstract class SkyRendererMixin {
         }
     }
 
-    @Inject(method = "renderStars", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "renderStars", at = @At("HEAD"), cancellable = true, require = 0)
     private void skyfog$hideStars(float starBrightness, PoseStack poseStack, CallbackInfo callback) {
         SkyFogConfig config = SkyFogConfig.get();
         if (config.enabled() && config.appliesToCurrentDimension() && config.general.hideStars) {
@@ -55,7 +55,7 @@ public abstract class SkyRendererMixin {
         }
     }
 
-    @Inject(method = "renderSunriseAndSunset", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "renderSunriseAndSunset", at = @At("HEAD"), cancellable = true, require = 0)
     private void skyfog$hideSunrise(PoseStack poseStack, float sunAngle, int color, CallbackInfo callback) {
         SkyFogConfig config = SkyFogConfig.get();
         if (config.enabled() && config.appliesToCurrentDimension()) {

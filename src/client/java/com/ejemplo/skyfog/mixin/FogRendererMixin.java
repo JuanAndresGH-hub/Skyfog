@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Ajusta el FogData que FogRenderer entrega antes de copiarlo al UBO de la GPU.
+ * Adjusts the FogData returned by FogRenderer before it reaches the GPU UBO.
  */
 @Mixin(value = FogRenderer.class, priority = 900)
 public abstract class FogRendererMixin {

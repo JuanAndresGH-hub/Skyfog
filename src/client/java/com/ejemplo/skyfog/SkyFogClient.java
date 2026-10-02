@@ -13,7 +13,7 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.network.chat.Component;
 
 /**
- * Registra la configuración y el comando exclusivamente en el cliente.
+ * Registers the client-only configuration and commands.
  */
 public final class SkyFogClient implements ClientModInitializer {
     private static KeyMapping openScreenKey;
@@ -66,7 +66,7 @@ public final class SkyFogClient implements ClientModInitializer {
             SkyFogConfig config = SkyFogConfig.get();
             config.setEnabled(!config.enabled());
             SkyFogConfig.save();
-            context.getSource().sendFeedback(Component.literal("SkyFog " + (config.enabled() ? "activada" : "desactivada")));
+            context.getSource().sendFeedback(message(config, config.enabled() ? "enabled" : "disabled"));
             return 1;
         });
     }
@@ -78,12 +78,12 @@ public final class SkyFogClient implements ClientModInitializer {
                     SkyFogConfig config = SkyFogConfig.get();
                     float value = FloatArgumentType.getFloat(context, "valor");
                     if (value >= config.end()) {
-                        context.getSource().sendError(Component.literal("start debe ser menor que end"));
+                        context.getSource().sendError(message(config, "start_invalid"));
                         return 0;
                     }
                     config.setStart(value);
                     SkyFogConfig.save();
-                    context.getSource().sendFeedback(Component.literal("Configuración de SkyFog actualizada"));
+                    context.getSource().sendFeedback(message(config, "updated"));
                     return 1;
                 }));
     }
@@ -95,12 +95,12 @@ public final class SkyFogClient implements ClientModInitializer {
                     SkyFogConfig config = SkyFogConfig.get();
                     float value = FloatArgumentType.getFloat(context, "valor");
                     if (value <= config.start()) {
-                        context.getSource().sendError(Component.literal("end debe ser mayor que start"));
+                        context.getSource().sendError(message(config, "end_invalid"));
                         return 0;
                     }
                     config.setEnd(value);
                     SkyFogConfig.save();
-                    context.getSource().sendFeedback(Component.literal("Configuración de SkyFog actualizada"));
+                    context.getSource().sendFeedback(message(config, "updated"));
                     return 1;
                 }));
     }
@@ -118,8 +118,13 @@ public final class SkyFogClient implements ClientModInitializer {
                                 FloatArgumentType.getFloat(context, "b")
                             );
                             SkyFogConfig.save();
-                            context.getSource().sendFeedback(Component.literal("Color de SkyFog actualizado"));
+                            context.getSource().sendFeedback(message(config, "color_updated"));
                             return 1;
                         }))));
+    }
+
+    private static Component message(SkyFogConfig config, String key) {
+        String language = "es".equals(config.general.language) ? "es" : "en";
+        return Component.translatable("chat.skyfog." + key + "." + language);
     }
 }

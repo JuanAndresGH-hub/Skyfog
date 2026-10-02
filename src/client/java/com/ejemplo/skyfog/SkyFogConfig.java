@@ -17,34 +17,38 @@ import io.github.notenoughupdates.moulconfig.annotations.ConfigOption;
 import io.github.notenoughupdates.moulconfig.common.text.StructuredText;
 import io.github.notenoughupdates.moulconfig.managed.ManagedConfig;
 import net.fabricmc.loader.api.FabricLoader;
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Objects;
 
 /**
- * Configuración cliente de SkyFog. ManagedConfig es el único escritor normal.
+ * Client configuration for SkyFog. ManagedConfig is the only normal writer.
  */
 public final class SkyFogConfig extends Config {
     private static final Gson MIGRATION_GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path FILE = FabricLoader.getInstance().getConfigDir().resolve("skyfog.json");
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static SkyFogConfig instance;
     private static ManagedConfig<SkyFogConfig> managed;
     private static String cachedPreview;
     private static float[] cachedRgb;
 
     @Expose
-    @Category(name = "General", desc = "Activación y presets de SkyFog.")
+    @Category(name = "General", desc = "SkyFog activation and presets.")
     public General general = new General();
 
     @Expose
-    @Category(name = "Niebla", desc = "Distancias de inicio y final de la niebla.")
+    @Category(name = "Fog", desc = "Fog start and end distances.")
     public Fog fog = new Fog();
 
     @Expose
-    @Category(name = "Color", desc = "Color RGB de la niebla.")
+    @Category(name = "Color", desc = "Fog RGB color.")
     public Color color = new Color();
 
     private static int toByte(float value) {
@@ -86,17 +90,29 @@ public final class SkyFogConfig extends Config {
         return Math.abs(first - second) <= 0.005F;
     }
 
-    private static float[] presetValues(String preset) {
+    private static float[] presetValues(Preset preset) {
         return switch (preset) {
-            case "Diana oscura" -> new float[] {8.0F, 80.0F, 0.40F};
-            case "Gris claro" -> new float[] {8.0F, 80.0F, 0.65F};
-            case "Niebla blanca" -> new float[] {8.0F, 80.0F, 0.90F};
-            default -> null;
+            case DIANA_DARK -> new float[] {8.0F, 80.0F, 0.40F};
+            case LIGHT_GRAY -> new float[] {8.0F, 80.0F, 0.65F};
+            case WHITE -> new float[] {8.0F, 80.0F, 0.90F};
+            case CUSTOM -> null;
         };
     }
 
-    private static boolean isNamedPreset(String preset) {
-        return presetValues(preset) != null;
+    private static boolean isNamedPreset(Preset preset) {
+        return preset != Preset.CUSTOM;
+    }
+
+    private static Preset parsePreset(Object value) {
+        if (value instanceof Preset preset) return preset;
+        if (!(value instanceof String text)) return Preset.DIANA_DARK;
+        return switch (text) {
+            case "DIANA_DARK", "Diana oscura", "Diana gris", "Oscura" -> Preset.DIANA_DARK;
+            case "LIGHT_GRAY", "Gris claro" -> Preset.LIGHT_GRAY;
+            case "WHITE", "Niebla blanca", "Blanca" -> Preset.WHITE;
+            case "CUSTOM", "Personalizado", "Personalizada" -> Preset.CUSTOM;
+            default -> Preset.DIANA_DARK;
+        };
     }
 
     private void setPreviewFromRgb(float r, float g, float b) {
@@ -112,19 +128,17 @@ public final class SkyFogConfig extends Config {
 
     private void applyPreset() {
         switch (general.preset) {
-            case "Diana oscura", "Diana gris", "Oscura" -> {
-                general.preset = "Diana oscura";
+            case DIANA_DARK -> {
                 fog.start = 8.0F;
                 fog.end = 80.0F;
                 setPreviewFromRgb(0.40F, 0.40F, 0.40F);
             }
-            case "Gris claro" -> {
+            case LIGHT_GRAY -> {
                 fog.start = 8.0F;
                 fog.end = 80.0F;
                 setPreviewFromRgb(0.65F, 0.65F, 0.65F);
             }
-            case "Niebla blanca", "Blanca" -> {
-                general.preset = "Niebla blanca";
+            case WHITE -> {
                 fog.start = 8.0F;
                 fog.end = 80.0F;
                 setPreviewFromRgb(0.90F, 0.90F, 0.90F);
@@ -174,8 +188,8 @@ public final class SkyFogConfig extends Config {
             || !nearlyEqual(fromByte(rgb[0]), expected[2])
             || !nearlyEqual(fromByte(rgb[1]), expected[2])
             || !nearlyEqual(fromByte(rgb[2]), expected[2]))) {
-            general.preset = "Personalizado";
-            general.lastAppliedPreset = "Personalizado";
+            general.preset = Preset.CUSTOM;
+            general.lastAppliedPreset = Preset.CUSTOM;
         }
     }
 
@@ -183,17 +197,10 @@ public final class SkyFogConfig extends Config {
         if (general == null) general = new General();
         if (fog == null) fog = new Fog();
         if (color == null) color = new Color();
-        if (general.preset == null) general.preset = "Diana oscura";
-        if (general.lastAppliedPreset == null) general.lastAppliedPreset = "";
-        if ("Diana gris".equals(general.preset) || "Oscura".equals(general.preset)) {
-            general.preset = "Diana oscura";
-        } else if ("Blanca".equals(general.preset)) {
-            general.preset = "Niebla blanca";
-        } else if ("Personalizada".equals(general.preset)) {
-            general.preset = "Personalizado";
-        }
+        general.preset = parsePreset(general.preset);
+        general.lastAppliedPreset = parsePreset(general.lastAppliedPreset);
         if (!isValidPreview(color.colorPreview)) setPreviewFromRgb(color.r, color.g, color.b);
-        if (!general.preset.equals(general.lastAppliedPreset)) {
+        if (general.preset != general.lastAppliedPreset) {
             if (isNamedPreset(general.preset)) applyPreset();
             general.lastAppliedPreset = general.preset;
         } else {
@@ -209,7 +216,7 @@ public final class SkyFogConfig extends Config {
 
     private void normalize() {
         ensureLiveState();
-        if ("Personalizado".equals(general.preset)) updateLegacyRgbFields();
+        if (general.preset == Preset.CUSTOM) updateLegacyRgbFields();
     }
 
     public static SkyFogConfig get() {
@@ -238,7 +245,7 @@ public final class SkyFogConfig extends Config {
     }
 
     /**
-     * Huella de los campos persistentes para detectar cambios hechos por la GUI.
+     * Hash of persistent fields used to detect GUI changes.
      */
     public int persistentHash() {
         ensureLiveState();
@@ -263,7 +270,7 @@ public final class SkyFogConfig extends Config {
     public void saveNow() {
         normalize();
         validate();
-        // ManagedConfig ya registró saveToFile() en saveRunnables.
+        // ManagedConfig registers saveToFile() in saveRunnables.
         super.saveNow();
     }
 
@@ -344,8 +351,8 @@ public final class SkyFogConfig extends Config {
 
     public void setColor(float r, float g, float b) {
         ensureLiveState();
-        general.preset = "Personalizado";
-        general.lastAppliedPreset = "Personalizado";
+        general.preset = Preset.CUSTOM;
+        general.lastAppliedPreset = Preset.CUSTOM;
         setPreviewFromRgb(r, g, b);
     }
 
@@ -353,7 +360,46 @@ public final class SkyFogConfig extends Config {
         if (!Files.exists(FILE)) return;
         try {
             JsonObject root = JsonParser.parseString(Files.readString(FILE, StandardCharsets.UTF_8)).getAsJsonObject();
-            if (root.has("general")) return;
+            if (root.has("general")) {
+                if (!root.get("general").isJsonObject()) throw new JsonSyntaxException("general must be an object");
+                JsonObject general = root.getAsJsonObject("general");
+                boolean changed = false;
+                requireBooleanIfPresent(general, "enabled");
+                requireBooleanIfPresent(general, "skyMatchesFog");
+                requireBooleanIfPresent(general, "hideSun");
+                requireBooleanIfPresent(general, "hideMoon");
+                requireBooleanIfPresent(general, "hideStars");
+                requireBooleanIfPresent(general, "hideClouds");
+                requireBooleanIfPresent(general, "applyInOtherDimensions");
+                requireNumberIfPresent(general, "darkness");
+                if (general.has("preset")) {
+                    if (!general.get("preset").isJsonPrimitive() || !general.getAsJsonPrimitive("preset").isString()) {
+                        throw new JsonSyntaxException("preset must be a string");
+                    }
+                    String old = general.get("preset").getAsString();
+                    String current = parsePreset(old).name();
+                    if (!current.equals(old)) {
+                        general.addProperty("preset", current);
+                        changed = true;
+                    }
+                }
+                if (general.has("lastAppliedPreset")) {
+                    if (!general.get("lastAppliedPreset").isJsonPrimitive() || !general.getAsJsonPrimitive("lastAppliedPreset").isString()) {
+                        throw new JsonSyntaxException("lastAppliedPreset must be a string");
+                    }
+                    String old = general.get("lastAppliedPreset").getAsString();
+                    String current = parsePreset(old).name();
+                    if (!current.equals(old)) {
+                        general.addProperty("lastAppliedPreset", current);
+                        changed = true;
+                    }
+                }
+                validateNestedObject(root, "fog", "start", "end");
+                validateNestedObject(root, "color", "colorPreview", "r", "g", "b");
+                if (changed) writeAtomic(MIGRATION_GSON.toJson(root));
+                return;
+            }
+
             SkyFogConfig migrated = new SkyFogConfig();
             if (root.has("enabled")) migrated.general.enabled = root.get("enabled").getAsBoolean();
             if (root.has("start")) migrated.fog.start = root.get("start").getAsFloat();
@@ -361,18 +407,74 @@ public final class SkyFogConfig extends Config {
             if (root.has("r")) migrated.color.r = root.get("r").getAsFloat();
             if (root.has("g")) migrated.color.g = root.get("g").getAsFloat();
             if (root.has("b")) migrated.color.b = root.get("b").getAsFloat();
-            migrated.general.preset = "Personalizado";
+            migrated.general.preset = Preset.CUSTOM;
+            migrated.general.lastAppliedPreset = Preset.CUSTOM;
             migrated.color.colorPreview = previewFromRgb(migrated.color.r, migrated.color.g, migrated.color.b);
-            Files.writeString(FILE, MIGRATION_GSON.toJson(migrated), StandardCharsets.UTF_8);
+            writeAtomic(MIGRATION_GSON.toJson(migrated));
         } catch (IOException | RuntimeException exception) {
-            throw new IllegalStateException("No se pudo migrar " + FILE, exception);
+            quarantineCorruptConfig(exception);
         }
+    }
+
+    private static void requireBooleanIfPresent(JsonObject object, String name) {
+        if (object.has(name) && (!object.get(name).isJsonPrimitive() || !object.getAsJsonPrimitive(name).isBoolean())) {
+            throw new JsonSyntaxException(name + " must be boolean");
+        }
+    }
+
+    private static void requireNumberIfPresent(JsonObject object, String name) {
+        if (object.has(name) && (!object.get(name).isJsonPrimitive() || !object.getAsJsonPrimitive(name).isNumber())) {
+            throw new JsonSyntaxException(name + " must be numeric");
+        }
+    }
+
+    private static void validateNestedObject(JsonObject root, String objectName, String... numericOrStringNames) {
+        if (!root.has(objectName)) return;
+        if (!root.get(objectName).isJsonObject()) throw new JsonSyntaxException(objectName + " must be an object");
+        JsonObject object = root.getAsJsonObject(objectName);
+        for (String name : numericOrStringNames) {
+            if (!object.has(name)) continue;
+            if (!object.get(name).isJsonPrimitive()) throw new JsonSyntaxException(name + " must be primitive");
+            if ("colorPreview".equals(name) && !object.getAsJsonPrimitive(name).isString()) {
+                throw new JsonSyntaxException(name + " must be a string");
+            }
+            if (!"colorPreview".equals(name) && !object.getAsJsonPrimitive(name).isNumber()) {
+                throw new JsonSyntaxException(name + " must be numeric");
+            }
+        }
+    }
+
+    private static void writeAtomic(String content) throws IOException {
+        Path temporary = FILE.resolveSibling(FILE.getFileName() + ".tmp");
+        Files.writeString(temporary, content, StandardCharsets.UTF_8);
+        try {
+            Files.move(temporary, FILE, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (java.nio.file.AtomicMoveNotSupportedException exception) {
+            Files.move(temporary, FILE, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private static void quarantineCorruptConfig(Exception exception) {
+        try {
+            if (Files.exists(FILE)) {
+                String suffix = String.valueOf(System.currentTimeMillis());
+                Path backup = FILE.resolveSibling("skyfog.json." + suffix + ".bak");
+                int counter = 1;
+                while (Files.exists(backup)) {
+                    backup = FILE.resolveSibling("skyfog.json." + suffix + "." + counter++ + ".bak");
+                }
+                Files.move(FILE, backup);
+            }
+        } catch (IOException backupException) {
+            LOGGER.warn("Could not quarantine corrupt SkyFog config", backupException);
+        }
+        LOGGER.warn("SkyFog config was invalid; defaults will be used", exception);
     }
 
     private static void resetDefaults() {
         SkyFogConfig config = get();
-        config.general.preset = "Diana oscura";
-        config.general.lastAppliedPreset = "";
+        config.general.preset = Preset.DIANA_DARK;
+        config.general.lastAppliedPreset = Preset.CUSTOM;
         config.general.enabled = true;
         config.general.darkness = 0.0F;
         config.general.skyMatchesFog = true;
@@ -386,12 +488,14 @@ public final class SkyFogConfig extends Config {
     }
 
     private void validate() {
-        if (!Float.isFinite(start()) || !Float.isFinite(end())
-            || !Float.isFinite(red()) || !Float.isFinite(green()) || !Float.isFinite(blue())) {
-            throw new JsonSyntaxException("Los valores de skyfog.json deben ser finitos");
-        }
-        if (start() < 0.0F || end() <= start() || end() > 300.0F) {
-            throw new JsonSyntaxException("La niebla debe tener 0 <= start < end <= 300");
+        try {
+            normalize();
+        } catch (RuntimeException exception) {
+            LOGGER.warn("SkyFog config values were invalid; defaults will be used", exception);
+            general = new General();
+            fog = new Fog();
+            color = new Color();
+            normalize();
         }
     }
 
@@ -402,73 +506,85 @@ public final class SkyFogConfig extends Config {
 
     public static final class General {
         @Expose
-        @ConfigOption(name = "Niebla activada", desc = "Activa o desactiva la niebla personalizada.")
+        @ConfigOption(name = "Fog enabled", desc = "Enable custom fog.")
         @ConfigEditorBoolean
         public boolean enabled = true;
 
         @Expose
-        @ConfigOption(name = "Preset", desc = "Acción visual para la niebla.")
-        @ConfigEditorDropdown(values = {"Diana oscura", "Gris claro", "Niebla blanca", "Personalizado"})
-        public String preset = "Diana oscura";
+        @ConfigOption(name = "Preset", desc = "Apply a fog preset.")
+        @ConfigEditorDropdown
+        public Preset preset = Preset.DIANA_DARK;
 
         @Expose
-        public String lastAppliedPreset = "";
+        public Preset lastAppliedPreset = Preset.CUSTOM;
 
         @Expose
-        @ConfigOption(name = "El cielo coincide con la niebla", desc = "Usa exactamente el color de la niebla para el cielo.")
+        @ConfigOption(name = "Language", desc = "Language used by SkyFog chat messages.")
+        @ConfigEditorDropdown(values = {"en", "es"})
+        public String language = "en";
+
+        @Expose
+        @ConfigOption(name = "Sky matches fog", desc = "Use exactly the fog color for the sky.")
         @ConfigEditorBoolean
         public boolean skyMatchesFog = true;
 
         @Expose
-        @ConfigOption(name = "Oscurecimiento", desc = "Multiplica el color base por (1 - este valor).")
+        @ConfigOption(name = "Darkness", desc = "Multiply the base color by (1 - this value).")
         @ConfigEditorSlider(minValue = 0.0F, maxValue = 1.0F, minStep = 0.01F)
         public float darkness = 0.0F;
 
         @Expose
-        @ConfigOption(name = "Ocultar sol", desc = "Oculta el sol del cielo.")
+        @ConfigOption(name = "Hide sun", desc = "Hide the sun.")
         @ConfigEditorBoolean
         public boolean hideSun = true;
 
         @Expose
-        @ConfigOption(name = "Ocultar luna", desc = "Oculta la luna del cielo.")
+        @ConfigOption(name = "Hide moon", desc = "Hide the moon.")
         @ConfigEditorBoolean
         public boolean hideMoon = true;
 
         @Expose
-        @ConfigOption(name = "Ocultar estrellas", desc = "Oculta las estrellas del cielo.")
+        @ConfigOption(name = "Hide stars", desc = "Hide the stars.")
         @ConfigEditorBoolean
         public boolean hideStars = true;
 
         @Expose
-        @ConfigOption(name = "Ocultar nubes", desc = "Oculta las nubes.")
+        @ConfigOption(name = "Hide clouds", desc = "Hide the clouds.")
         @ConfigEditorBoolean
         public boolean hideClouds = true;
 
         @Expose
-        @ConfigOption(name = "Aplicar en otras dimensiones", desc = "Aplica SkyFog también en Nether y End.")
+        @ConfigOption(name = "Other dimensions", desc = "Also apply SkyFog in the Nether and End.")
         @ConfigEditorBoolean
         public boolean applyInOtherDimensions = false;
 
-        @ConfigOption(name = "Valores por defecto", desc = "Restaura la configuración inicial de SkyFog.")
-        @ConfigEditorButton(buttonText = "Restablecer")
+        @ConfigOption(name = "Reset defaults", desc = "Restore the initial SkyFog configuration.")
+        @ConfigEditorButton(buttonText = "Reset")
         public transient Runnable resetDefaults = SkyFogConfig::resetDefaults;
+    }
+
+    public enum Preset {
+        DIANA_DARK,
+        LIGHT_GRAY,
+        WHITE,
+        CUSTOM
     }
 
     public static final class Fog {
         @Expose
-        @ConfigOption(name = "Inicio", desc = "Distancia en bloques donde empieza la niebla.")
+        @ConfigOption(name = "Start", desc = "Distance in blocks where fog starts.")
         @ConfigEditorSlider(minValue = 0.0F, maxValue = 300.0F, minStep = 1.0F)
         public float start = 8.0F;
 
         @Expose
-        @ConfigOption(name = "Fin", desc = "Distancia en bloques donde termina la niebla.")
+        @ConfigOption(name = "End", desc = "Distance in blocks where fog ends.")
         @ConfigEditorSlider(minValue = 0.0F, maxValue = 300.0F, minStep = 1.0F)
         public float end = 80.0F;
     }
 
     public static final class Color {
         @Expose
-        @ConfigOption(name = "Color", desc = "Selector visual del color de niebla.")
+        @ConfigOption(name = "Color", desc = "Visual fog color selector.")
         @ConfigEditorColour
         public String colorPreview = "0:255:102:102:102";
 

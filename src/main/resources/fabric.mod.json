@@ -3,11 +3,16 @@
   "id": "skyfog",
   "version": "${version}",
   "name": "SkyFog",
-  "description": "Niebla visual configurable para el cliente.",
+  "description": "Configurable client-side visual fog.",
   "authors": [
-    "Juan Andres"
+    "Anqqqqqq"
   ],
   "license": "MIT",
+  "contact": {
+    "homepage": "https://github.com/JuanAndresGH-hub/Skyfog",
+    "sources": "https://github.com/JuanAndresGH-hub/Skyfog",
+    "issues": "https://github.com/JuanAndresGH-hub/Skyfog/issues"
+  },
   "environment": "client",
   "entrypoints": {
     "client": [

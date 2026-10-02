@@ -1,0 +1,14 @@
+SkyFog bundles or depends on the following third-party software:
+
+MoulConfig 4.7.2
+Copyright (C) 2023 NotEnoughUpdates contributors.
+License: GNU Lesser General Public License, version 3 or later (LGPL-3.0-or-later).
+Source: https://github.com/NotEnoughUpdates/MoulConfig
+
+Kotlin standard library 2.3.20
+Copyright (c) JetBrains s.r.o. and Kotlin contributors.
+License: Apache License 2.0.
+Source: https://github.com/JetBrains/kotlin
+
+The complete license texts are available from the respective source
+repositories and are included in the published dependency artifacts.
