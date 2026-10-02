@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "skyfog",
+  "version": "${version}",
+  "name": "SkyFog",
+  "description": "Niebla visual configurable para el cliente.",
+  "authors": [
+    "Ejemplo"
+  ],
+  "environment": "client",
+  "accessWidener": "skyfog.accesswidener",
+  "entrypoints": {
+    "client": [
+      "com.ejemplo.skyfog.SkyFogClient"
+    ]
+  },
+  "mixins": [
+    {
+      "config": "skyfog.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "26.2"
+  }
+}

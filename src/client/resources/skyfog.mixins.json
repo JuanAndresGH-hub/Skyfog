@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "package": "com.ejemplo.skyfog.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "FogRendererMixin",
+    "SkyRendererMixin",
+    "CloudRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
