@@ -32,26 +32,22 @@ public final class SkyFogClient implements ClientModInitializer {
                 SkyFogConfig.openEditor();
             }
         });
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
-            dispatcher.register(ClientCommands.literal("skyfog")
-                .executes(context -> {
-                    context.getSource().getClient().execute(SkyFogConfig::openEditor);
-                    return 1;
-                })
-                .then(toggleCommand())
-                .then(startCommand())
-                .then(endCommand())
-                .then(colorCommand())));
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
-            dispatcher.register(ClientCommands.literal("sf")
-                .executes(context -> {
-                    context.getSource().getClient().execute(SkyFogConfig::openEditor);
-                    return 1;
-                })
-                .then(toggleCommand())
-                .then(startCommand())
-                .then(endCommand())
-                .then(colorCommand())));
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
+            dispatcher.register(command("skyfog"));
+            dispatcher.register(command("sf"));
+        });
+    }
+
+    private static LiteralArgumentBuilder<FabricClientCommandSource> command(String literal) {
+        return ClientCommands.literal(literal)
+            .executes(context -> {
+                context.getSource().getClient().execute(SkyFogConfig::openEditor);
+                return 1;
+            })
+            .then(toggleCommand())
+            .then(startCommand())
+            .then(endCommand())
+            .then(colorCommand());
     }
 
     private static LiteralArgumentBuilder<FabricClientCommandSource> toggleCommand() {

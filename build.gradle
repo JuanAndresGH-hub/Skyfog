@@ -33,6 +33,7 @@ dependencies {
     implementation "org.notenoughupdates.moulconfig:modern-26.2:4.7.2"
     implementation "org.jetbrains.kotlin:kotlin-stdlib:2.3.20"
     include "org.notenoughupdates.moulconfig:modern-26.2:4.7.2"
+    include "org.jetbrains.kotlin:kotlin-stdlib:2.3.20"
 }
 
 processResources {

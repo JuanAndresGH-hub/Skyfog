@@ -6,6 +6,8 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.fog.FogData;
 import net.minecraft.client.renderer.fog.FogRenderer;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.LivingEntity;
 import org.joml.Vector4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -29,7 +31,9 @@ public abstract class FogRendererMixin {
     ) {
         SkyFogConfig config = SkyFogConfig.get();
         if (!config.enabled() || !config.appliesTo(level)
-            || camera.getFluidInCamera() != net.minecraft.world.level.material.FogType.NONE) {
+            || camera.getFluidInCamera() != net.minecraft.world.level.material.FogType.NONE
+            || (camera.entity() instanceof LivingEntity living
+                && (living.hasEffect(MobEffects.BLINDNESS) || living.hasEffect(MobEffects.DARKNESS)))) {
             return;
         }
 

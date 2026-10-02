@@ -5,10 +5,10 @@
   "name": "SkyFog",
   "description": "Niebla visual configurable para el cliente.",
   "authors": [
-    "Ejemplo"
+    "Juan Andres"
   ],
+  "license": "MIT",
   "environment": "client",
-  "accessWidener": "skyfog.accesswidener",
   "entrypoints": {
     "client": [
       "com.ejemplo.skyfog.SkyFogClient"
@@ -22,6 +22,8 @@
   ],
   "depends": {
     "fabricloader": ">=0.19.3",
-    "minecraft": "26.2"
+    "minecraft": "~26.2",
+    "fabric-api": "*",
+    "java": ">=25"
   }
 }

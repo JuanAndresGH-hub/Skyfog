@@ -9,6 +9,7 @@ import com.google.gson.annotations.Expose;
 import io.github.notenoughupdates.moulconfig.Config;
 import io.github.notenoughupdates.moulconfig.annotations.Category;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorBoolean;
+import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorButton;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorColour;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorDropdown;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorSlider;
@@ -18,17 +19,20 @@ import io.github.notenoughupdates.moulconfig.managed.ManagedConfig;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Punto único de lectura y escritura de la configuración de SkyFog.
+ * Configuración cliente de SkyFog. ManagedConfig es el único escritor normal.
  */
 public final class SkyFogConfig extends Config {
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Gson MIGRATION_GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path FILE = FabricLoader.getInstance().getConfigDir().resolve("skyfog.json");
+    private static SkyFogConfig instance;
+    private static ManagedConfig<SkyFogConfig> managed;
+    private static String cachedPreview;
+    private static float[] cachedRgb;
 
     @Expose
     @Category(name = "General", desc = "Activación y presets de SkyFog.")
@@ -41,21 +45,6 @@ public final class SkyFogConfig extends Config {
     @Expose
     @Category(name = "Color", desc = "Color RGB de la niebla.")
     public Color color = new Color();
-
-    @Expose
-    @Category(name = "HUD", desc = "Preparado para futuros elementos HUD.")
-    public Hud hud = new Hud();
-
-    private static SkyFogConfig instance;
-    private static ManagedConfig<SkyFogConfig> managed;
-
-    public SkyFogConfig() {
-    }
-
-    // Formato legacy que espera MoulConfig: velocidad:alpha:r:g:b
-    private static String legacyColorFromRgb(float r, float g, float b) {
-        return "0:255:" + toByte(r) + ":" + toByte(g) + ":" + toByte(b);
-    }
 
     private static int toByte(float value) {
         return Math.max(0, Math.min(255, Math.round(value * 255.0F)));
@@ -73,115 +62,157 @@ public final class SkyFogConfig extends Config {
         return Math.max(0.0F, Math.min(300.0F, value));
     }
 
-    private static int[] parseLegacyPreview(String preview) {
-        if (preview == null) {
-            return null;
-        }
+    private static String previewFromRgb(float r, float g, float b) {
+        return "0:255:" + toByte(r) + ":" + toByte(g) + ":" + toByte(b);
+    }
+
+    private static int[] parsePreview(String preview) {
+        if (preview == null) return null;
         String[] parts = preview.split(":", -1);
-        if (parts.length != 5) {
-            return null;
-        }
+        if (parts.length != 5) return null;
         try {
-            return new int[] {
-                Integer.parseInt(parts[2]),
-                Integer.parseInt(parts[3]),
-                Integer.parseInt(parts[4])
-            };
+            int r = Integer.parseInt(parts[2]);
+            int g = Integer.parseInt(parts[3]);
+            int b = Integer.parseInt(parts[4]);
+            if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) return null;
+            return new int[] {r, g, b};
         } catch (NumberFormatException ignored) {
             return null;
         }
     }
 
-    private static void applyPreset(SkyFogConfig config) {
-        switch (config.general.preset) {
+    private static boolean nearlyEqual(float first, float second) {
+        return Math.abs(first - second) <= 0.005F;
+    }
+
+    private static float[] presetValues(String preset) {
+        return switch (preset) {
+            case "Diana oscura" -> new float[] {8.0F, 80.0F, 0.40F};
+            case "Gris claro" -> new float[] {8.0F, 80.0F, 0.65F};
+            case "Niebla blanca" -> new float[] {8.0F, 80.0F, 0.90F};
+            default -> null;
+        };
+    }
+
+    private static boolean isNamedPreset(String preset) {
+        return presetValues(preset) != null;
+    }
+
+    private void setPreviewFromRgb(float r, float g, float b) {
+        r = clamp01(Float.isFinite(r) ? r : 0.40F);
+        g = clamp01(Float.isFinite(g) ? g : 0.40F);
+        b = clamp01(Float.isFinite(b) ? b : 0.40F);
+        color.colorPreview = previewFromRgb(r, g, b);
+        color.r = r;
+        color.g = g;
+        color.b = b;
+        cachedPreview = null;
+    }
+
+    private void applyPreset() {
+        switch (general.preset) {
             case "Diana oscura", "Diana gris", "Oscura" -> {
-                config.fog.start = 8.0F;
-                config.fog.end = 80.0F;
-                config.color.r = 0.40F;
-                config.color.g = 0.40F;
-                config.color.b = 0.40F;
-                config.general.preset = "Diana oscura";
+                general.preset = "Diana oscura";
+                fog.start = 8.0F;
+                fog.end = 80.0F;
+                setPreviewFromRgb(0.40F, 0.40F, 0.40F);
             }
             case "Gris claro" -> {
-                config.fog.start = 8.0F;
-                config.fog.end = 80.0F;
-                config.color.r = 0.65F;
-                config.color.g = 0.65F;
-                config.color.b = 0.65F;
+                fog.start = 8.0F;
+                fog.end = 80.0F;
+                setPreviewFromRgb(0.65F, 0.65F, 0.65F);
             }
             case "Niebla blanca", "Blanca" -> {
-                config.fog.start = 8.0F;
-                config.fog.end = 80.0F;
-                config.color.r = 0.90F;
-                config.color.g = 0.90F;
-                config.color.b = 0.90F;
-                config.general.preset = "Niebla blanca";
+                general.preset = "Niebla blanca";
+                fog.start = 8.0F;
+                fog.end = 80.0F;
+                setPreviewFromRgb(0.90F, 0.90F, 0.90F);
             }
             default -> {
             }
         }
     }
 
-    private static void normalize(SkyFogConfig config) {
-        if (config.general == null) config.general = new General();
-        if (config.fog == null) config.fog = new Fog();
-        if (config.color == null) config.color = new Color();
-        if (config.hud == null) config.hud = new Hud();
-
-        if (config.general.preset == null) {
-            config.general.preset = "Diana oscura";
+    private void sanitizeFog() {
+        if (!Float.isFinite(fog.start)) fog.start = 8.0F;
+        if (!Float.isFinite(fog.end)) fog.end = 80.0F;
+        fog.start = clampFog(fog.start);
+        fog.end = clampFog(fog.end);
+        if (fog.end <= fog.start) {
+            if (fog.start >= 300.0F) fog.start = 299.0F;
+            fog.end = Math.min(300.0F, fog.start + 1.0F);
         }
-        if ("Personalizada".equals(config.general.preset)) {
-            config.general.preset = "Personalizado";
-        }
-
-        if (!Float.isFinite(config.fog.start)) config.fog.start = 8.0F;
-        if (!Float.isFinite(config.fog.end)) config.fog.end = 80.0F;
-        if (!Float.isFinite(config.color.r)) config.color.r = 0.62F;
-        if (!Float.isFinite(config.color.g)) config.color.g = 0.62F;
-        if (!Float.isFinite(config.color.b)) config.color.b = 0.62F;
-        if (!Float.isFinite(config.general.darkness)) config.general.darkness = 0.0F;
-
-        if (!"Personalizado".equals(config.general.preset)) {
-            applyPreset(config);
-        } else {
-            int[] rgb = parseLegacyPreview(config.color.colorPreview);
-            if (rgb != null) {
-                config.color.r = fromByte(rgb[0]);
-                config.color.g = fromByte(rgb[1]);
-                config.color.b = fromByte(rgb[2]);
-            }
-        }
-
-        config.fog.start = clampFog(config.fog.start);
-        config.fog.end = clampFog(config.fog.end);
-        if (config.fog.end <= config.fog.start) {
-            if (config.fog.start >= 300.0F) {
-                config.fog.start = 299.0F;
-                config.fog.end = 300.0F;
-            } else {
-                config.fog.end = config.fog.start + 1.0F;
-            }
-        }
-
-        config.color.r = clamp01(config.color.r);
-        config.color.g = clamp01(config.color.g);
-        config.color.b = clamp01(config.color.b);
-        config.general.darkness = clamp01(config.general.darkness);
-        config.color.colorPreview = legacyColorFromRgb(config.color.r, config.color.g, config.color.b);
     }
 
-    private static void normalizeColorPreview(SkyFogConfig config) {
-        String preview = config.color.colorPreview;
-        if (preview == null || preview.split(":", -1).length != 5) {
-            config.color.colorPreview = "0:255:158:158:158";
+    private void updateLegacyRgbFields() {
+        float[] rgb = parsedRgb();
+        color.r = rgb[0];
+        color.g = rgb[1];
+        color.b = rgb[2];
+    }
+
+    private float[] parsedRgb() {
+        if (!color.colorPreview.equals(cachedPreview)) {
+            int[] rgb = parsePreview(color.colorPreview);
+            if (rgb == null) {
+                setPreviewFromRgb(color.r, color.g, color.b);
+                rgb = parsePreview(color.colorPreview);
+            }
+            cachedPreview = color.colorPreview;
+            cachedRgb = new float[] {fromByte(rgb[0]), fromByte(rgb[1]), fromByte(rgb[2])};
         }
+        return cachedRgb;
+    }
+
+    private void markPresetAsCustomIfChanged() {
+        float[] expected = presetValues(general.preset);
+        int[] rgb = parsePreview(color.colorPreview);
+        if (expected != null && (rgb == null
+            || !nearlyEqual(fog.start, expected[0])
+            || !nearlyEqual(fog.end, expected[1])
+            || !nearlyEqual(fromByte(rgb[0]), expected[2])
+            || !nearlyEqual(fromByte(rgb[1]), expected[2])
+            || !nearlyEqual(fromByte(rgb[2]), expected[2]))) {
+            general.preset = "Personalizado";
+            general.lastAppliedPreset = "Personalizado";
+        }
+    }
+
+    private void ensureLiveState() {
+        if (general == null) general = new General();
+        if (fog == null) fog = new Fog();
+        if (color == null) color = new Color();
+        if (general.preset == null) general.preset = "Diana oscura";
+        if (general.lastAppliedPreset == null) general.lastAppliedPreset = "";
+        if ("Diana gris".equals(general.preset) || "Oscura".equals(general.preset)) {
+            general.preset = "Diana oscura";
+        } else if ("Blanca".equals(general.preset)) {
+            general.preset = "Niebla blanca";
+        } else if ("Personalizada".equals(general.preset)) {
+            general.preset = "Personalizado";
+        }
+        if (!isValidPreview(color.colorPreview)) setPreviewFromRgb(color.r, color.g, color.b);
+        if (!general.preset.equals(general.lastAppliedPreset)) {
+            if (isNamedPreset(general.preset)) applyPreset();
+            general.lastAppliedPreset = general.preset;
+        } else {
+            markPresetAsCustomIfChanged();
+        }
+        sanitizeFog();
+        general.darkness = clamp01(Float.isFinite(general.darkness) ? general.darkness : 0.0F);
+    }
+
+    private static boolean isValidPreview(String preview) {
+        return parsePreview(preview) != null;
+    }
+
+    private void normalize() {
+        ensureLiveState();
+        if ("Personalizado".equals(general.preset)) updateLegacyRgbFields();
     }
 
     public static SkyFogConfig get() {
-        if (instance == null) {
-            instance = loadLegacyOrDefaults();
-        }
+        if (instance == null) initializeManaged();
         return instance;
     }
 
@@ -190,9 +221,9 @@ public final class SkyFogConfig extends Config {
             migrateLegacyFile();
             managed = ManagedConfig.create(FILE.toFile(), SkyFogConfig.class);
             instance = managed.getInstance();
-            normalize(instance);
+            instance.normalize();
             instance.validate();
-            save();
+            instance.saveNow();
         }
     }
 
@@ -202,20 +233,14 @@ public final class SkyFogConfig extends Config {
     }
 
     public static void save() {
-        SkyFogConfig config = get();
-        normalize(config);
-        config.validate();
-        try {
-            Files.createDirectories(FILE.getParent());
-            Files.writeString(FILE, GSON.toJson(config), StandardCharsets.UTF_8);
-        } catch (IOException exception) {
-            throw new UncheckedIOException("No se pudo guardar " + FILE, exception);
-        }
+        get().saveNow();
     }
 
     @Override
     public void saveNow() {
-        save();
+        normalize();
+        validate();
+        super.saveNow();
     }
 
     public boolean enabled() {
@@ -227,45 +252,42 @@ public final class SkyFogConfig extends Config {
     }
 
     public float start() {
-        if (isPreset()) {
-            return 8.0F;
-        }
+        ensureLiveState();
         return fog.start;
     }
 
     public void setStart(float value) {
-        general.preset = "Personalizado";
-        fog.start = value;
+        ensureLiveState();
+        fog.start = clampFog(value);
+        if (fog.end <= fog.start) fog.end = Math.min(300.0F, fog.start + 1.0F);
+        markPresetAsCustomIfChanged();
     }
 
     public float end() {
-        if (isPreset()) {
-            return 80.0F;
-        }
+        ensureLiveState();
         return fog.end;
     }
 
     public void setEnd(float value) {
-        general.preset = "Personalizado";
-        fog.end = value;
+        ensureLiveState();
+        fog.end = clampFog(value);
+        if (fog.end <= fog.start) fog.start = Math.max(0.0F, fog.end - 1.0F);
+        markPresetAsCustomIfChanged();
     }
 
     public float red() {
-        return color.r;
+        ensureLiveState();
+        return parsedRgb()[0];
     }
 
     public float green() {
-        return color.g;
+        ensureLiveState();
+        return parsedRgb()[1];
     }
 
     public float blue() {
-        return color.b;
-    }
-
-    private boolean isPreset() {
-        return "Diana oscura".equals(general.preset)
-            || "Gris claro".equals(general.preset)
-            || "Niebla blanca".equals(general.preset);
+        ensureLiveState();
+        return parsedRgb()[2];
     }
 
     public float effectiveRed() {
@@ -297,43 +319,17 @@ public final class SkyFogConfig extends Config {
     }
 
     public void setColor(float r, float g, float b) {
+        ensureLiveState();
         general.preset = "Personalizado";
-        color.r = r;
-        color.g = g;
-        color.b = b;
-        color.colorPreview = legacyColorFromRgb(r, g, b);
-    }
-
-    private static SkyFogConfig loadLegacyOrDefaults() {
-        if (!Files.exists(FILE)) {
-            SkyFogConfig config = new SkyFogConfig();
-            instance = config;
-            save();
-            return config;
-        }
-        try {
-            SkyFogConfig config = GSON.fromJson(Files.readString(FILE, StandardCharsets.UTF_8), SkyFogConfig.class);
-            if (config == null) {
-                throw new JsonSyntaxException("El archivo está vacío");
-            }
-            normalizeColorPreview(config);
-            normalize(config);
-            config.validate();
-            return config;
-        } catch (IOException exception) {
-            throw new UncheckedIOException("No se pudo leer " + FILE, exception);
-        }
+        general.lastAppliedPreset = "Personalizado";
+        setPreviewFromRgb(r, g, b);
     }
 
     private static void migrateLegacyFile() {
-        if (!Files.exists(FILE)) {
-            return;
-        }
+        if (!Files.exists(FILE)) return;
         try {
             JsonObject root = JsonParser.parseString(Files.readString(FILE, StandardCharsets.UTF_8)).getAsJsonObject();
-            if (!root.has("enabled") && root.has("general")) {
-                return;
-            }
+            if (root.has("general")) return;
             SkyFogConfig migrated = new SkyFogConfig();
             if (root.has("enabled")) migrated.general.enabled = root.get("enabled").getAsBoolean();
             if (root.has("start")) migrated.fog.start = root.get("start").getAsFloat();
@@ -342,22 +338,35 @@ public final class SkyFogConfig extends Config {
             if (root.has("g")) migrated.color.g = root.get("g").getAsFloat();
             if (root.has("b")) migrated.color.b = root.get("b").getAsFloat();
             migrated.general.preset = "Personalizado";
-            normalizeColorPreview(migrated);
-            Files.writeString(FILE, GSON.toJson(migrated), StandardCharsets.UTF_8);
+            migrated.color.colorPreview = previewFromRgb(migrated.color.r, migrated.color.g, migrated.color.b);
+            Files.writeString(FILE, MIGRATION_GSON.toJson(migrated), StandardCharsets.UTF_8);
         } catch (IOException | RuntimeException exception) {
             throw new IllegalStateException("No se pudo migrar " + FILE, exception);
         }
     }
 
+    private static void resetDefaults() {
+        SkyFogConfig config = get();
+        config.general.preset = "Diana oscura";
+        config.general.lastAppliedPreset = "";
+        config.general.darkness = 0.0F;
+        config.general.skyMatchesFog = true;
+        config.general.hideSun = true;
+        config.general.hideMoon = true;
+        config.general.hideStars = true;
+        config.general.hideClouds = true;
+        config.general.applyInOtherDimensions = false;
+        config.normalize();
+        config.saveNow();
+    }
+
     private void validate() {
-        if (!Float.isFinite(start()) || !Float.isFinite(end()) || !Float.isFinite(red()) || !Float.isFinite(green()) || !Float.isFinite(blue())) {
+        if (!Float.isFinite(start()) || !Float.isFinite(end())
+            || !Float.isFinite(red()) || !Float.isFinite(green()) || !Float.isFinite(blue())) {
             throw new JsonSyntaxException("Los valores de skyfog.json deben ser finitos");
         }
         if (start() < 0.0F || end() <= start() || end() > 300.0F) {
             throw new JsonSyntaxException("La niebla debe tener 0 <= start < end <= 300");
-        }
-        if (red() < 0.0F || red() > 1.0F || green() < 0.0F || green() > 1.0F || blue() < 0.0F || blue() > 1.0F) {
-            throw new JsonSyntaxException("Los componentes r, g y b deben estar entre 0 y 1");
         }
     }
 
@@ -369,17 +378,20 @@ public final class SkyFogConfig extends Config {
     public static final class General {
         @Expose
         @ConfigOption(name = "Niebla activada", desc = "Activa o desactiva la niebla personalizada.")
-        @ConfigEditorBoolean(runnableId = 0)
+        @ConfigEditorBoolean
         public boolean enabled = true;
 
         @Expose
-        @ConfigOption(name = "Preset", desc = "Preset visual para la niebla.")
+        @ConfigOption(name = "Preset", desc = "Acción visual para la niebla.")
         @ConfigEditorDropdown(values = {"Diana oscura", "Gris claro", "Niebla blanca", "Personalizado"})
         public String preset = "Diana oscura";
 
         @Expose
+        public String lastAppliedPreset = "";
+
+        @Expose
         @ConfigOption(name = "El cielo coincide con la niebla", desc = "Usa exactamente el color de la niebla para el cielo.")
-        @ConfigEditorBoolean(runnableId = 0)
+        @ConfigEditorBoolean
         public boolean skyMatchesFog = true;
 
         @Expose
@@ -389,28 +401,33 @@ public final class SkyFogConfig extends Config {
 
         @Expose
         @ConfigOption(name = "Ocultar sol", desc = "Oculta el sol del cielo.")
-        @ConfigEditorBoolean(runnableId = 0)
+        @ConfigEditorBoolean
         public boolean hideSun = true;
 
         @Expose
         @ConfigOption(name = "Ocultar luna", desc = "Oculta la luna del cielo.")
-        @ConfigEditorBoolean(runnableId = 0)
+        @ConfigEditorBoolean
         public boolean hideMoon = true;
 
         @Expose
         @ConfigOption(name = "Ocultar estrellas", desc = "Oculta las estrellas del cielo.")
-        @ConfigEditorBoolean(runnableId = 0)
+        @ConfigEditorBoolean
         public boolean hideStars = true;
 
         @Expose
         @ConfigOption(name = "Ocultar nubes", desc = "Oculta las nubes.")
-        @ConfigEditorBoolean(runnableId = 0)
+        @ConfigEditorBoolean
         public boolean hideClouds = true;
 
         @Expose
         @ConfigOption(name = "Aplicar en otras dimensiones", desc = "Aplica SkyFog también en Nether y End.")
-        @ConfigEditorBoolean(runnableId = 0)
+        @ConfigEditorBoolean
         public boolean applyInOtherDimensions = false;
+
+        @Expose
+        @ConfigOption(name = "Valores por defecto", desc = "Restaura la configuración inicial de SkyFog.")
+        @ConfigEditorButton(buttonText = "Restablecer")
+        public transient Runnable resetDefaults = SkyFogConfig::resetDefaults;
     }
 
     public static final class Fog {
@@ -429,28 +446,15 @@ public final class SkyFogConfig extends Config {
         @Expose
         @ConfigOption(name = "Color", desc = "Selector visual del color de niebla.")
         @ConfigEditorColour
-        public String colorPreview = "0:255:158:158:158";
+        public String colorPreview = "0:255:102:102:102";
 
         @Expose
-        @ConfigOption(name = "Rojo", desc = "Componente roja del color de niebla.")
-        @ConfigEditorSlider(minValue = 0.0F, maxValue = 1.0F, minStep = 0.01F)
-        public float r = 0.62F;
+        public float r = 0.40F;
 
         @Expose
-        @ConfigOption(name = "Verde", desc = "Componente verde del color de niebla.")
-        @ConfigEditorSlider(minValue = 0.0F, maxValue = 1.0F, minStep = 0.01F)
-        public float g = 0.62F;
+        public float g = 0.40F;
 
         @Expose
-        @ConfigOption(name = "Azul", desc = "Componente azul del color de niebla.")
-        @ConfigEditorSlider(minValue = 0.0F, maxValue = 1.0F, minStep = 0.01F)
-        public float b = 0.62F;
-    }
-
-    public static final class Hud {
-        @Expose
-        @ConfigOption(name = "Editor HUD", desc = "Reservado para posiciones HUD arrastrables.")
-        @ConfigEditorBoolean(runnableId = 0)
-        public boolean enabled = false;
+        public float b = 0.40F;
     }
 }
