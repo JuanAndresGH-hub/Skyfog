@@ -115,6 +115,12 @@ public final class SkyFogConfig extends Config {
         };
     }
 
+    private static Language parseLanguage(Object value) {
+        if (value instanceof Language language) return language;
+        if (value instanceof String text && "es".equalsIgnoreCase(text)) return Language.SPANISH;
+        return Language.ENGLISH;
+    }
+
     private void setPreviewFromRgb(float r, float g, float b) {
         r = clamp01(Float.isFinite(r) ? r : 0.40F);
         g = clamp01(Float.isFinite(g) ? g : 0.40F);
@@ -260,6 +266,7 @@ public final class SkyFogConfig extends Config {
             general.hideStars,
             general.hideClouds,
             general.applyInOtherDimensions,
+            general.language,
             fog.start,
             fog.end,
             color.colorPreview
@@ -387,6 +394,15 @@ public final class SkyFogConfig extends Config {
                     if (!general.get("lastAppliedPreset").isJsonPrimitive() || !general.getAsJsonPrimitive("lastAppliedPreset").isString()) {
                         throw new JsonSyntaxException("lastAppliedPreset must be a string");
                     }
+                    if (general.has("language")) {
+                        if (!general.get("language").isJsonPrimitive()) throw new JsonSyntaxException("language must be a string");
+                        String old = general.get("language").getAsString();
+                        String current = parseLanguage(old).name();
+                        if (!current.equals(old)) {
+                            general.addProperty("language", current);
+                            changed = true;
+                        }
+                    }
                     String old = general.get("lastAppliedPreset").getAsString();
                     String current = parsePreset(old).name();
                     if (!current.equals(old)) {
@@ -476,6 +492,7 @@ public final class SkyFogConfig extends Config {
         config.general.preset = Preset.DIANA_DARK;
         config.general.lastAppliedPreset = Preset.CUSTOM;
         config.general.enabled = true;
+        config.general.language = Language.ENGLISH;
         config.general.darkness = 0.0F;
         config.general.skyMatchesFog = true;
         config.general.hideSun = true;
@@ -521,7 +538,7 @@ public final class SkyFogConfig extends Config {
         @Expose
         @ConfigOption(name = "Language", desc = "Language used by SkyFog chat messages.")
         @ConfigEditorDropdown(values = {"en", "es"})
-        public String language = "en";
+        public Language language = Language.ENGLISH;
 
         @Expose
         @ConfigOption(name = "Sky matches fog", desc = "Use exactly the fog color for the sky.")
@@ -567,7 +584,27 @@ public final class SkyFogConfig extends Config {
         DIANA_DARK,
         LIGHT_GRAY,
         WHITE,
-        CUSTOM
+        CUSTOM;
+
+        @Override
+        public String toString() {
+            return switch (this) {
+                case DIANA_DARK -> "Diana dark";
+                case LIGHT_GRAY -> "Light gray";
+                case WHITE -> "White";
+                case CUSTOM -> "Custom";
+            };
+        }
+    }
+
+    public enum Language {
+        ENGLISH,
+        SPANISH;
+
+        @Override
+        public String toString() {
+            return this == ENGLISH ? "English" : "Español";
+        }
     }
 
     public static final class Fog {

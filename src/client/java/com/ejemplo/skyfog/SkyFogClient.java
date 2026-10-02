@@ -73,10 +73,10 @@ public final class SkyFogClient implements ClientModInitializer {
 
     private static LiteralArgumentBuilder<FabricClientCommandSource> startCommand() {
         return ClientCommands.literal("start")
-            .then(ClientCommands.argument("valor", FloatArgumentType.floatArg(0.0F, 300.0F))
+            .then(ClientCommands.argument("blocks", FloatArgumentType.floatArg(0.0F, 300.0F))
                 .executes(context -> {
                     SkyFogConfig config = SkyFogConfig.get();
-                    float value = FloatArgumentType.getFloat(context, "valor");
+                    float value = FloatArgumentType.getFloat(context, "blocks");
                     if (value >= config.end()) {
                         context.getSource().sendError(message(config, "start_invalid"));
                         return 0;
@@ -90,10 +90,10 @@ public final class SkyFogClient implements ClientModInitializer {
 
     private static LiteralArgumentBuilder<FabricClientCommandSource> endCommand() {
         return ClientCommands.literal("end")
-            .then(ClientCommands.argument("valor", FloatArgumentType.floatArg(0.0F, 300.0F))
+            .then(ClientCommands.argument("blocks", FloatArgumentType.floatArg(0.0F, 300.0F))
                 .executes(context -> {
                     SkyFogConfig config = SkyFogConfig.get();
-                    float value = FloatArgumentType.getFloat(context, "valor");
+                    float value = FloatArgumentType.getFloat(context, "blocks");
                     if (value <= config.start()) {
                         context.getSource().sendError(message(config, "end_invalid"));
                         return 0;
@@ -124,7 +124,7 @@ public final class SkyFogClient implements ClientModInitializer {
     }
 
     private static Component message(SkyFogConfig config, String key) {
-        String language = "es".equals(config.general.language) ? "es" : "en";
+        String language = config.general.language == SkyFogConfig.Language.SPANISH ? "es" : "en";
         return Component.translatable("chat.skyfog." + key + "." + language);
     }
 }

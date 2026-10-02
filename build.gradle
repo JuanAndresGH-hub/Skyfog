@@ -43,6 +43,21 @@ dependencies {
     include "org.jetbrains.kotlin:kotlin-stdlib:2.3.20"
 }
 
+tasks.register("copyThirdPartyLicenses", Copy) {
+    from(zipTree(configurations.runtimeClasspath.find { it.name.startsWith("modern-26.2-4.7.2") })) {
+        include "LICENSE"
+        rename { "MoulConfig-LICENSE.txt" }
+    }
+    from("licenses") {
+        include "Apache-2.0.txt"
+    }
+    into(layout.buildDirectory.dir("resources/client/META-INF/licenses"))
+}
+
+tasks.named("processClientResources") {
+    dependsOn("copyThirdPartyLicenses")
+}
+
 processResources {
     inputs.property "version", project.version
 

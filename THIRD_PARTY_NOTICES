@@ -10,5 +10,7 @@ Copyright (c) JetBrains s.r.o. and Kotlin contributors.
 License: Apache License 2.0.
 Source: https://github.com/JetBrains/kotlin
 
-The complete license texts are available from the respective source
-repositories and are included in the published dependency artifacts.
+The MoulConfig 4.7.2 POM declares LGPL-3.0-or-later and points to
+NotEnoughUpdates/NotEnoughUpdates/COPYING.LESSER. The Kotlin stdlib 2.3.20
+POM declares Apache-2.0. Full texts are included in `licenses/` and in the
+mod jar under `META-INF/licenses/`.
